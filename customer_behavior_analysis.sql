@@ -1,0 +1,158 @@
+SELECT
+	*
+FROM
+	CUSTOMERS;
+
+-- Which Membership Type (Gold, Silver, Bronze) generates the highest total revenue?
+SELECT
+	MEMBERSHIP_TYPE,
+	ROUND(SUM(TOTAL_SPEND::NUMERIC), 2) AS TOTAL_REVENUE
+FROM
+	CUSTOMERS
+GROUP BY
+	MEMBERSHIP_TYPE
+ORDER BY
+	TOTAL_REVENUE DESC;
+
+--What is the average order value (Total Spend divided by Items Purchased) for each city?
+SELECT
+	CITY,
+	round((SUM(TOTAL_SPEND::numeric) / SUM(ITEMS_PURCHASED)),2) as Average_order_value
+FROM
+	CUSTOMERS
+GROUP BY
+	CITY;
+
+-- Are Bronze members significantly more "Unsatisfied" than Gold members?
+SELECT
+	MEMBERSHIP_TYPE,
+	COUNT(*) FILTER (
+		WHERE
+			SATISFACTION_LEVEL = 'Unsatisfied'
+	) AS UNSATISFIED_COUNT
+FROM
+	CUSTOMERS
+WHERE
+	MEMBERSHIP_TYPE IN ('Gold', 'Bronze')
+GROUP BY
+	MEMBERSHIP_TYPE;
+
+--Which City has the highest average Satisfaction Level?
+SELECT
+	CITY,
+	ROUND(
+		AVG(
+			CASE
+				WHEN SATISFACTION_LEVEL = 'Satisfied' THEN 3
+				WHEN SATISFACTION_LEVEL = 'Neutral' THEN 2
+				WHEN SATISFACTION_LEVEL = 'Unsatisfied' THEN 1
+				ELSE NULL
+			END
+		),
+		2
+	) AS AVG_SATISFACTION_SCORE,
+	COUNT(*) AS TOTAL_RESPONSE
+FROM
+	CUSTOMERS
+GROUP BY
+	CITY
+ORDER BY
+	AVG_SATISFACTION_SCORE DESC;
+
+--Is there a specific Gender preference for certain membership types or cities?
+SELECT
+	CITY,
+	MEMBERSHIP_TYPE,
+	COUNT(*) AS TOTAL_MEMBERS,
+	COUNT(*) FILTER (
+		WHERE
+			GENDER = 'Male'
+	) AS MALE_COUNT,
+	COUNT(*) FILTER (
+		WHERE
+			GENDER = 'Female'
+	) AS FEMALE_COUNT,
+	ROUND(
+		100.0 * COUNT(*) FILTER (
+			WHERE
+				GENDER = 'Male'
+		) / COUNT(*),
+		2
+	) AS MALE_PERCENTAGE,
+	ROUND(
+		100.0 * COUNT(*) FILTER (
+			WHERE
+				GENDER = 'Female'
+		) / COUNT(*),
+		2
+	) AS FEMALE_PERCENTAGE
+FROM
+	CUSTOMERS
+GROUP BY
+	CITY,
+	MEMBERSHIP_TYPE
+ORDER BY
+	CITY,
+	MEMBERSHIP_TYPE;
+
+---- Does offering a discount increase customer satisfaction levels, or does it have no impact?
+SELECT
+	SATISFACTION_LEVEL,
+	COUNT(*) AS TOTAL_CUSTOMERS,
+	COUNT(
+		CASE
+			WHEN DISCOUNT_APPLIED = TRUE THEN 1
+		END
+	) AS RECEIVED_DISCOUNT,
+	COUNT(
+		CASE
+			WHEN DISCOUNT_APPLIED = FALSE THEN 1
+		END
+	) AS NO_DISCOUNT,
+	ROUND(
+		(
+			COUNT(
+				CASE
+					WHEN DISCOUNT_APPLIED = TRUE THEN 1
+				END
+			)::NUMERIC / COUNT(*)
+		) * 100,
+		1
+	) AS DISCOUNT_RATE_PCT
+FROM
+	CUSTOMERS
+GROUP BY
+	SATISFACTION_LEVEL
+ORDER BY
+	DISCOUNT_RATE_PCT DESC;
+
+--- Which Age group (e.g., 20-29, 30-39, 40+) spends the most money and buys the most items?
+WITH
+	AGE_BUCKETS AS (
+		SELECT
+			*,
+			CASE
+				WHEN AGE BETWEEN 20 AND 29  THEN '20-29'
+				WHEN AGE BETWEEN 30 AND 39  THEN '30-39'
+				WHEN AGE >= 40 THEN '40+'
+				ELSE 'Other'
+			END AS AGE_GROUP
+		FROM
+			CUSTOMERS
+	)
+SELECT
+	AGE_GROUP,
+	COUNT(*) AS TOTAL_CUSTOMERS,
+	SUM(TOTAL_SPEND) AS TOTAL_MONEY_SPENT,
+	ROUND(AVG(TOTAL_SPEND)::NUMERIC, 2) AS AVG_SPEND_PER_CUSTOMER,
+	SUM(ITEMS_PURCHASED) AS TOTAL_ITEMS_BOUGHT,
+	ROUND(AVG(ITEMS_PURCHASED)::NUMERIC, 1) AS AVG_ITEMS_PER_CUSTOMER
+FROM
+	AGE_BUCKETS
+WHERE
+	AGE_GROUP != 'Other'
+GROUP BY
+	AGE_GROUP
+ORDER BY
+	TOTAL_MONEY_SPENT DESC,
+	TOTAL_ITEMS_BOUGHT DESC;
